@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewApp creates a new App application struct
@@ -19,6 +23,24 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	// Perform your setup here
 	a.ctx = ctx
+
+	// create emitter
+	var emitterCtx context.Context
+	emitterCtx, a.cancel = context.WithCancel(ctx)
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		i := 0
+		for {
+			select {
+			case <-ticker.C:
+				i++
+				runtime.EventsEmit(ctx, "second", i)
+			case <-emitterCtx.Done():
+				return
+			}
+		}
+	}()
 }
 
 // domReady is called after front-end resources have been loaded
@@ -36,6 +58,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
 	// Perform your teardown here
+
+	// stop emitter
+	a.cancel()
 }
 
 // Greet returns a greeting for the given name
